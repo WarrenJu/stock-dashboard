@@ -1,40 +1,49 @@
 import streamlit as st
-import requests
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
 
-# 1. 페이지 설정 및 스타일
-st.set_page_config(page_title="2026 주식 분석 터미널", layout="wide")
-st.title("📈 종목별 실시간 순위 및 상세 분석")
+# ────────────────────────────────────────────
+# 전역 페이지 설정 (app.py에서 한 번만 선언)
+# ────────────────────────────────────────────
+st.set_page_config(
+    page_title="주식 분석 대시보드",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# 2. API 설정 (Secrets 활용)
-APP_KEY = st.secrets["APP_KEY"]
-APP_SECRET = st.secrets["APP_SECRET"]
-URL_BASE = "https://openapi.koreainvestment.com:9443"
+# ────────────────────────────────────────────
+# 사이드바 공통 UI
+# ────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("## 📈 주식 대시보드")
+    st.caption("한국투자증권 KIS API")
+    st.divider()
 
-@st.cache_data(ttl=3600) # 토큰은 1시간 동안 재사용
-def get_access_token():
-    res = requests.post(f"{URL_BASE}/oauth2/tokenP", 
-        json={"grant_type": "client_credentials", "appkey": APP_KEY, "appsecret": APP_SECRET})
-    return res.json()['access_token']
+# ────────────────────────────────────────────
+# 페이지 등록 (st.Page + st.navigation)
+# ────────────────────────────────────────────
+pg = st.navigation(
+    {
+        "📊 시장 분석": [
+            st.Page(
+                "pages/ranking.py",
+                title="순위 분석",
+                icon=":material/leaderboard:",
+                default=True,
+            ),
+        ],
+        # 이후 추가할 페이지들
+        # "🔍 종목 분석": [
+        #     st.Page("pages/stock_detail.py", title="종목 상세", icon=":material/candlestick_chart:"),
+        # ],
+        # "💼 포트폴리오": [
+        #     st.Page("pages/portfolio.py", title="내 포트폴리오", icon=":material/pie_chart:"),
+        # ],
+    },
+    position="sidebar",
+    expanded=True,
+)
 
-def get_stock_info(token, code):
-    headers = {"authorization": f"Bearer {token}", "appkey": APP_KEY, "appsecret": APP_SECRET, "tr_id": "FHKST01010100"}
-    res = requests.get(f"{URL_BASE}/uapi/domestic-stock/v1/quotations/inquire-price", 
-                       headers=headers, params={"fid_cond_mrkt_div_code": "J", "fid_input_iscd": code})
-    return res.json()['output']
-
-def get_investor_data(token, code):
-    # 기관/외국인 매매내역 (최근 수급)
-    headers = {"authorization": f"Bearer {token}", "appkey": APP_KEY, "appsecret": APP_SECRET, "tr_id": "FHKST01010900"}
-    res = requests.get(f"{URL_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor", 
-                       headers=headers, params={"fid_cond_mrkt_div_code": "J", "fid_input_iscd": code})
-    return res.json()['output']
-
-# --- 사이드바: 필터 설정 ---
-st.sidebar.header("🔍 필터 설정")
-selected_date = st.sidebar.date_input("조회 날짜", datetime.now())
+pg.run()selected_date = st.sidebar.date_input("조회 날짜", datetime.now())
 sort_standard = st.sidebar.selectbox("정렬 기준", ["거래대금", "거래량", "변동률"])
 
 # --- 메인 로직 ---
