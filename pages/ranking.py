@@ -1,47 +1,32 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-from pykrx import stock as pykrx_stock
-from api.kis_api import (
-    get_volume_rank,
-    get_amount_rank,
-    get_fluctuation_rank,
-    get_daily_chart,
-    get_foreign_institution_estimate,
-)
+from datetime import datetime
+from api.kis_api import get_volume_rank, get_amount_rank, get_fluctuation_rank
 
 st.set_page_config(page_title="순위 분석", layout="wide")
 st.title("📊 주식 순위 분석")
 
-# ────────────────────────────────────────────
-# 상단 컨트롤
-# ────────────────────────────────────────────
-col1, col2, col3 = st.columns([2, 2, 2])
+# ── 컨트롤
+col1, col2 = st.columns([2, 2])
 
 with col1:
-    selected_date = st.date_input(
-        "날짜 선택",
-        value=datetime.today(),
-        max_value=datetime.today(),
-    )
-
-with col2:
-    market = st.selectbox(
-        "시장",
-        options=["전체", "코스피", "코스닥"],
-        index=0,
-    )
+    market = st.selectbox("시장", ["전체", "코스피", "코스닥"])
     market_code = {"전체": "0000", "코스피": "0001", "코스닥": "1001"}[market]
     market_code_fluc = {"전체": "J", "코스피": "J", "코스닥": "Q"}[market]
 
-with col3:
-    criteria = st.selectbox(
-        "기준",
-        options=["거래대금", "거래량", "변동률"],
-        index=0,
-    )
+with col2:
+    criteria = st.selectbox("기준", ["거래대금", "거래량", "변동률"])
 
+# 날짜는 표시만, 조회는 현재 기준
+now = datetime.now()
+is_market_open = now.weekday() < 5 and 9 <= now.hour < 16
+
+if not is_market_open:
+    st.info(
+        f"📅 현재 장 마감 상태입니다. "
+        f"순위 데이터는 **마지막 거래일 기준**으로 표시됩니다. "
+        f"(KIS API 특성상 실시간 순위만 제공)"
+    )
 # ────────────────────────────────────────────
 # 데이터 로드
 # ────────────────────────────────────────────
