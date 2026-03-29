@@ -34,13 +34,4 @@ pg = st.navigation(
     expanded=True,
 )
 
-pg.run()        # ],
-        # "💼 포트폴리오": [
-        #     st.Page("pages/portfolio.py", title="내 포트폴리오", icon=":material/pie_chart:"),
-        # ],
-    },
-    position="sidebar",
-    expanded=True,
-)
-
 pg.run()
