@@ -46,52 +46,66 @@ with col3:
 # ────────────────────────────────────────────
 @st.cache_data(ttl=300)
 def load_rank(criteria: str, market_code: str, market_code_fluc: str):
-    if criteria == "거래대금":
-        raw = get_amount_rank(market_code)
-        rows = []
-        for i, d in enumerate(raw[:50], 1):
-            rows.append({
-                "순위": i,
-                "종목코드": d.get("mksc_shrn_iscd", ""),
-                "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0)):,}",
-                "전일대비(%)": d.get("prdy_ctrt", ""),
-                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0)) // 1_000_000:,}",
-                "거래량": f"{int(d.get('acml_vol', 0)):,}",
-            })
-        return pd.DataFrame(rows)
+    try:
+        if criteria == "거래대금":
+            raw = get_amount_rank(market_code)
+        elif criteria == "거래량":
+            raw = get_volume_rank(market_code)
+        else:
+            raw = get_fluctuation_rank(market_code_fluc)
+    except Exception as e:
+        st.error(f"API 호출 오류: {e}")
+        return pd.DataFrame()
 
-    elif criteria == "거래량":
-        raw = get_volume_rank(market_code)
-        rows = []
-        for i, d in enumerate(raw[:50], 1):
+    # ── API 응답 자체가 비어있을 때
+    if not raw:
+        st.warning("API 응답이 비어있습니다. 응답 원문을 확인하세요.")
+        return pd.DataFrame()
+
+    # ── 실제 응답 필드명 확인용 (처음 한 번만 확인 후 제거 가능)
+    st.expander("🔍 API 응답 원문 (디버그)").write(raw[0] if raw else "없음")
+
+    rows = []
+    for i, d in enumerate(raw[:50], 1):
+        if criteria == "거래대금":
             rows.append({
                 "순위": i,
                 "종목코드": d.get("mksc_shrn_iscd", ""),
                 "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0)):,}",
+                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
                 "전일대비(%)": d.get("prdy_ctrt", ""),
-                "거래량": f"{int(d.get('acml_vol', 0)):,}",
+                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0) or 0) // 1_000_000:,}",
+                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
+            })
+        elif criteria == "거래량":
+            rows.append({
+                "순위": i,
+                "종목코드": d.get("mksc_shrn_iscd", ""),
+                "종목명": d.get("hts_kor_isnm", ""),
+                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
+                "전일대비(%)": d.get("prdy_ctrt", ""),
+                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
                 "거래량증가율(%)": d.get("vol_inrt", ""),
             })
-        return pd.DataFrame(rows)
-
-    else:  # 변동률
-        raw = get_fluctuation_rank(market_code_fluc)
-        rows = []
-        for i, d in enumerate(raw[:50], 1):
+        else:
             rows.append({
                 "순위": i,
                 "종목코드": d.get("mksc_shrn_iscd", ""),
                 "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0)):,}",
+                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
                 "변동률(%)": d.get("prdy_ctrt", ""),
-                "거래량": f"{int(d.get('acml_vol', 0)):,}",
-                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0)) // 1_000_000:,}",
+                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
+                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0) or 0) // 1_000_000:,}",
             })
-        return pd.DataFrame(rows)
+
+    return pd.DataFrame(rows)
 
 df = load_rank(criteria, market_code, market_code_fluc)
+
+# ── 빈 df 방어
+if df.empty:
+    st.error("데이터를 불러오지 못했습니다. 위 디버그 메시지를 확인하세요.")
+    st.stop()  # 이하 코드 실행 중단
 
 # ────────────────────────────────────────────
 # 순위 테이블
