@@ -49,7 +49,7 @@ def get_headers(tr_id: str) -> dict:
     return {
         "content-type": "application/json",
         "authorization": f"Bearer {get_access_token()}",
-        "appkey":st.secrets["KIS_APP_KEY"],
+        "appkey": st.secrets["KIS_APP_KEY"],
         "appsecret": st.secrets["KIS_APP_SECRET"],
         "tr_id": tr_id,
         "custtype": "P",
