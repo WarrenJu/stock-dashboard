@@ -51,7 +51,7 @@ def load_rank(criteria: str, market: str, date_str: str):
     date_str: 'YYYYMMDD'
     market: '코스피' | '코스닥' | '전체'
     """
-    try:
+    if 1:
         markets = []
         if market == "전체":
             markets = ["KOSPI", "KOSDAQ"]
