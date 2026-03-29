@@ -1,12 +1,54 @@
 import requests
 import streamlit as st
+from datetime import datetime, timedelta
 
 BASE_URL = "https://openapi.koreainvestment.com:9443"
 
+# ────────────────────────────────────────────
+# Access Token 자동 발급 및 캐싱
+# ────────────────────────────────────────────
+def get_access_token() -> str:
+    """
+    Access Token을 발급받아 st.session_state에 캐싱.
+    만료 시 자동 재발급.
+    """
+    now = datetime.now()
+
+    # 이미 유효한 토큰이 있으면 재사용
+    if (
+        "kis_token" in st.session_state
+        and "kis_token_exp" in st.session_state
+        and st.session_state["kis_token_exp"] > now
+    ):
+        return st.session_state["kis_token"]
+
+    # 신규 발급
+    url = f"{BASE_URL}/oauth2/tokenP"
+    body = {
+        "grant_type": "client_credentials",
+        "appkey": st.secrets["KIS_APP_KEY"],
+        "appsecret": st.secrets["KIS_APP_SECRET"],
+    }
+    r = requests.post(url, json=body)
+    r.raise_for_status()
+    data = r.json()
+
+    token = data["access_token"]
+    # 만료 시각 (유효기간 24시간, 여유 있게 23시간으로 설정)
+    expires_at = now + timedelta(hours=23)
+
+    st.session_state["kis_token"] = token
+    st.session_state["kis_token_exp"] = expires_at
+
+    return token
+
+# ────────────────────────────────────────────
+# 공통 헤더
+# ────────────────────────────────────────────
 def get_headers(tr_id: str) -> dict:
     return {
         "content-type": "application/json",
-        "authorization": f"Bearer {st.secrets['KIS_ACCESS_TOKEN']}",
+        "authorization": f"Bearer {get_access_token()}",
         "appkey": st.secrets["KIS_APP_KEY"],
         "appsecret": st.secrets["KIS_APP_SECRET"],
         "tr_id": tr_id,
