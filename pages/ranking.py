@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from pykrx import stock as pykrx_stock
 from api.kis_api import (
     get_volume_rank,
     get_amount_rank,
@@ -44,63 +45,76 @@ with col3:
 # ────────────────────────────────────────────
 # 데이터 로드
 # ────────────────────────────────────────────
-@st.cache_data(ttl=300)
-def load_rank(criteria: str, market_code: str, market_code_fluc: str):
+@st.cache_data(ttl=3600)
+def load_rank(criteria: str, market: str, date_str: str):
+    """
+    date_str: 'YYYYMMDD'
+    market: '코스피' | '코스닥' | '전체'
+    """
     try:
-        if criteria == "거래대금":
-            raw = get_amount_rank(market_code)
-        elif criteria == "거래량":
-            raw = get_volume_rank(market_code)
+        markets = []
+        if market == "전체":
+            markets = ["KOSPI", "KOSDAQ"]
+        elif market == "코스피":
+            markets = ["KOSPI"]
         else:
-            raw = get_fluctuation_rank(market_code_fluc)
+            markets = ["KOSDAQ"]
+
+        dfs = []
+        for mkt in markets:
+            df_mkt = pykrx_stock.get_market_ohlcv_by_ticker(date_str, market=mkt)
+            df_mkt["시장"] = mkt
+            df_mkt["종목코드"] = df_mkt.index
+            df_mkt["종목명"] = [
+                pykrx_stock.get_market_ticker_name(t) for t in df_mkt.index
+            ]
+            dfs.append(df_mkt)
+
+        df = pd.concat(dfs).reset_index(drop=True)
+
+        # 빈 데이터 (휴장일 등)
+        if df.empty:
+            return pd.DataFrame()
+
+        # 기준별 정렬
+        if criteria == "거래대금":
+            df = df.sort_values("거래대금", ascending=False)
+            show_cols = ["종목코드", "종목명", "시장", "종가", "등락률", "거래대금", "거래량"]
+        elif criteria == "거래량":
+            df = df.sort_values("거래량", ascending=False)
+            show_cols = ["종목코드", "종목명", "시장", "종가", "등락률", "거래량", "거래대금"]
+        else:  # 변동률
+            df = df.sort_values("등락률", ascending=False)
+            show_cols = ["종목코드", "종목명", "시장", "종가", "등락률", "거래량", "거래대금"]
+
+        df = df[show_cols].head(50).reset_index(drop=True)
+        df.index += 1
+        df.index.name = "순위"
+
+        # 포맷
+        df["종가"] = df["종가"].apply(lambda x: f"{int(x):,}")
+        df["거래량"] = df["거래량"].apply(lambda x: f"{int(x):,}")
+        df["거래대금"] = df["거래대금"].apply(lambda x: f"{int(x) // 1_000_000:,} 백만")
+        df["등락률"] = df["등락률"].apply(lambda x: f"{x:.2f}%")
+
+        return df
+
     except Exception as e:
-        st.error(f"API 호출 오류: {e}")
+        st.error(f"데이터 로드 오류: {e}")
         return pd.DataFrame()
+selected_date = st.date_input(
+    "날짜 선택",
+    value=datetime.today() - timedelta(days=1),  # 기본값: 어제
+    max_value=datetime.today(),
+)
 
-    # ── API 응답 자체가 비어있을 때
-    if not raw:
-        st.warning("API 응답이 비어있습니다. 응답 원문을 확인하세요.")
-        return pd.DataFrame()
+# 주말 감지
+if selected_date.weekday() >= 5:
+    st.warning("⚠️ 주말은 휴장입니다. 가장 가까운 평일을 선택해주세요.")
+    st.stop()
 
-    # ── 실제 응답 필드명 확인용 (처음 한 번만 확인 후 제거 가능)
-    st.expander("🔍 API 응답 원문 (디버그)").write(raw[0] if raw else "없음")
-
-    rows = []
-    for i, d in enumerate(raw[:50], 1):
-        if criteria == "거래대금":
-            rows.append({
-                "순위": i,
-                "종목코드": d.get("mksc_shrn_iscd", ""),
-                "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
-                "전일대비(%)": d.get("prdy_ctrt", ""),
-                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0) or 0) // 1_000_000:,}",
-                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
-            })
-        elif criteria == "거래량":
-            rows.append({
-                "순위": i,
-                "종목코드": d.get("mksc_shrn_iscd", ""),
-                "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
-                "전일대비(%)": d.get("prdy_ctrt", ""),
-                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
-                "거래량증가율(%)": d.get("vol_inrt", ""),
-            })
-        else:
-            rows.append({
-                "순위": i,
-                "종목코드": d.get("mksc_shrn_iscd", ""),
-                "종목명": d.get("hts_kor_isnm", ""),
-                "현재가": f"{int(d.get('stck_prpr', 0) or 0):,}",
-                "변동률(%)": d.get("prdy_ctrt", ""),
-                "거래량": f"{int(d.get('acml_vol', 0) or 0):,}",
-                "거래대금(백만)": f"{int(d.get('acml_tr_pbmn', 0) or 0) // 1_000_000:,}",
-            })
-
-    return pd.DataFrame(rows)
-
-df = load_rank(criteria, market_code, market_code_fluc)
+date_str = selected_date.strftime("%Y%m%d")
+df = load_rank(criteria, market, date_str)
 
 # ── 빈 df 방어
 if df.empty:
