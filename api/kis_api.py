@@ -26,8 +26,8 @@ def get_access_token() -> str:
     url = f"{BASE_URL}/oauth2/tokenP"
     body = {
         "grant_type": "client_credentials",
-        "appkey": st.secrets["KIS_APP_KEY"],
-        "appsecret": st.secrets["KIS_APP_SECRET"],
+        "appkey": KIS_APP_KEY,
+        "appsecret": KIS_APP_SECRET,
     }
     r = requests.post(url, json=body)
     r.raise_for_status()
