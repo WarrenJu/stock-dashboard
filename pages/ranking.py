@@ -99,9 +99,6 @@ def load_rank(criteria: str, market: str, date_str: str):
 
         return df
 
-    except Exception as e:
-        st.error(f"데이터 로드 오류: {e}")
-        return pd.DataFrame()
 selected_date = st.date_input(
     "날짜 선택",
     value=datetime.today() - timedelta(days=1),  # 기본값: 어제
