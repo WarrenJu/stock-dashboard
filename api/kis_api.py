@@ -26,8 +26,8 @@ def get_access_token() -> str:
     url = f"{BASE_URL}/oauth2/tokenP"
     body = {
         "grant_type": "client_credentials",
-        "appkey": st.scerets["KIS_APP_KEY"],
-        "appsecret": st.scerets["KIS_APP_SECRET"],
+        "appkey": st.secrets["KIS_APP_KEY"],
+        "appsecret": st.secrets["KIS_APP_SECRET"],
     }
     r = requests.post(url, json=body)
     r.raise_for_status()
@@ -49,8 +49,8 @@ def get_headers(tr_id: str) -> dict:
     return {
         "content-type": "application/json",
         "authorization": f"Bearer {get_access_token()}",
-        "appkey":st.scerets["KIS_APP_KEY"],
-        "appsecret": st.scerets["KIS_APP_SECRET"],
+        "appkey":st.secrets["KIS_APP_KEY"],
+        "appsecret": st.secrets["KIS_APP_SECRET"],
         "tr_id": tr_id,
         "custtype": "P",
     }
